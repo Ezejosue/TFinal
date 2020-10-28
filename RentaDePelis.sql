@@ -160,3 +160,42 @@ SELECT * FROM Cliente;
 SELECT * FROM Pelicula;
 SELECT * FROM Renta;
 
+-- a.
+SELECT NombreCliente, Edad FROM Cliente WHERE Edad > 25 ORDER BY Edad ASC
+
+-- b.
+SELECT NombreCliente, Edad FROM Cliente WHERE Edad > 18 AND Edad < 26
+
+-- c.
+SELECT NombreCliente, Fecha_Afiliacion FROM Cliente WHERE Fecha_Afiliacion > '2008/04/01' AND Fecha_Afiliacion < '2008/06/30'
+
+-- d.
+SELECT NombreCliente, R.CodigoCliente FROM Renta R LEFT JOIN Cliente C ON R.CodigoCliente = C.CodigoCliente
+
+-- e.
+SELECT SUM(Disponibilidad) AS [Total en inventario] FROM Pelicula
+
+
+
+-- VISTAS
+-- a.
+CREATE VIEW dbo.rentasClientes (Cliente, Veces)
+AS
+	SELECT NombreCliente, COUNT(R.CodigoCliente) 
+	FROM Renta R 
+	LEFT JOIN Cliente C 
+	ON R.CodigoCliente = C.CodigoCliente 
+	GROUP BY NombreCliente
+GO
+
+SELECT * FROM rentasClientes WHERE Veces >= 2;
+
+
+-- b.
+CREATE VIEW dbo.primerasRentadas ([Codigo de pelicula], [Pelicula rentada], [Fecha de renta])
+AS
+	SELECT TOP 4(R.CodigoPelicula), NombrePelicula, Fecha_Renta
+	FROM Renta R 
+	LEFT JOIN Pelicula P
+	ON R.CodigoPelicula = P.CodigoPelicula 
+GO
