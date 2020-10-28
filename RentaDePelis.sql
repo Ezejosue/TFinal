@@ -135,8 +135,8 @@ INSERT INTO Pelicula VALUES
 ('PE004', 'Midsommar', '18/07/2019', 22, 6.25, 'TI002', 'CA002'),
 ('PE005', 'Enola Holmes', '25/09/2020', 40, 10.50, 'TI002', 'CA002'),
 ('PE006', 'Bohemian', '14/09/2018', 12, 7.20, 'TI001', 'CA004'),
-('PE007', 'IT', '20/02/2019', 16, 10.00, 'TI001', 'CA004'),
-('PE008', 'Yo antes de ti', '17/07/2017', 14, 5.00, 'TI003', 'CA003'),
+('PE007', 'IT', '20/02/2019', 16, 10.00, 'TI001', 'CA001'),
+('PE008', 'Yo antes de ti', '17/07/2017', 14, 5.00, 'TI003', 'CA001'),
 ('PE009', 'John Constantine', '02/04/2015', 30, 5.00, 'TI003', 'CA002'),
 ('PE010', 'El conjuro', '03/07/2016', 25, 7.00, 'TI002', 'CA002');
 
@@ -146,7 +146,7 @@ INSERT INTO Renta VALUES
 ('RE003', 'CL003', 'PE002', '18/08/2020', '19/08/2020', NULL),
 ('RE004', 'CL004', 'PE002', '18/07/2020', '20/07/2020', 3.00),
 ('RE005', 'CL002', 'PE003', '18/11/2019', '20/11/2019', NULL),
-('RE006', 'CL007', 'PE004', '18/04/2019', '23/04/2029', 5.00),
+('RE006', 'CL007', 'PE004', '18/04/2019', '23/04/2019', 5.00),
 ('RE007', 'CL007', 'PE005', '07/10/2020', '08/10/2020', NULL),
 ('RE008', 'CL001', 'PE005', '08/11/2020', '18/11/2020', 3.20),
 ('RE009', 'CL003', 'PE003', '02/10/2019', '03/10/2019', NULL),
@@ -179,6 +179,23 @@ INNER JOIN TipoPelicula T
 ON P.CodigoDepeli = T.CodigoDepeli
 WHERE NombreTipo = 'DVD'
 
+-- f
+SELECT CONCAT(NombreCliente, ' ', ApellidoCliente) AS Nombre_Completo, Mora 
+FROM Cliente C INNER JOIN Renta R ON C.CodigoCliente=R.CodigoCliente WHERE Mora IS NOT NULL; 
+
+-- g
+SELECT CONCAT(NombreCliente, ' ', ApellidoCliente) AS Nombre_Completo, Mora 
+FROM Cliente C INNER JOIN Renta R ON C.CodigoCliente=R.CodigoCliente WHERE Mora IS NULL; 
+
+-- h 
+SELECT NombrePelicula, Mora FROM Pelicula P INNER JOIN Renta R ON P.CodigoPelicula=R.CodigoPelicula WHERE Mora IS NOT NULL;
+
+-- i 
+SELECT NombrePelicula, NombreCategoria FROM Pelicula P INNER JOIN Renta R ON P.CodigoPelicula=R.CodigoPelicula INNER JOIN CategoriaPelicula CP ON
+P.CodigoCategoria = CP.CodigoCategoria WHERE CP.NombreCategoria = 'Comedia';
+
+-- j
+SELECT P.NombrePelicula FROM Pelicula P LEFT JOIN Renta R ON P.CodigoPelicula=R.CodigoPelicula WHERE CodigoRenta IS NULL;
 
 
 -- VISTAS
@@ -220,6 +237,28 @@ GO
 
 SELECT [Categoria], [Veces vendida] FROM categoriasAlquiladas WHERE [Veces vendida] IN (SELECT MAX([Veces vendida]) FROM categoriasAlquiladas);
 SELECT [Categoria], [Veces vendida] FROM categoriasAlquiladas WHERE [Veces vendida] IN (SELECT MIN([Veces vendida]) FROM categoriasAlquiladas);
+
+-- d.
+
+CREATE VIEW dbo.peliculasEnconceptodeDinero ([Nombre Pelicula], [TOTAL])
+AS  
+    SELECT P.NombrePelicula, (COUNT(R.CodigoPelicula)*P.Costo)+R.Mora
+    FROM Pelicula P INNER JOIN Renta R ON P.CodigoPelicula = R.CodigoPelicula
+    GROUP BY P.NombrePelicula, P.Costo, R.Mora 
+    HAVING (COUNT(R.CodigoPelicula)*P.Costo)+R.Mora > 0
+GO
+
+SELECT * FROM dbo.peliculasEnconceptodeDinero;
+
+-- e.
+CREATE VIEW dbo.RentaPersona ([Nombre Pelicula], [Nombre Completo], [Fecha Renta])
+AS
+    SELECT TOP 5 P.NombrePelicula, CONCAT(C.NombreCliente, ' ', C.ApellidoCliente), R.Fecha_Renta
+    FROM Pelicula P INNER JOIN Renta R ON P.CodigoPelicula=R.CodigoPelicula INNER JOIN Cliente C ON C.CodigoCliente = R.CodigoCliente WHERE R.Fecha_Renta >= DATEADD(MONTH, -11, GETDATE());
+
+GO
+
+SELECT * FROM dbo.RentaPersona;
 
 
 -- PROCEDIMIENTOS ALMACENADOS
@@ -267,3 +306,81 @@ AS
 GO 
 
 EXEC peliculasCliente 'Darrel'
+
+-- d.
+CREATE PROCEDURE sp_datosPelicula
+    @Nombrepelicula VARCHAR(50)
+AS
+BEGIN TRY
+BEGIN TRAN
+IF(SELECT COUNT(*)
+FROM Pelicula
+WHERE NombrePelicula=@Nombrepelicula)=1
+    SELECT P.NombrePelicula, C.NombreCategoria, P.Disponibilidad
+FROM Pelicula P INNER JOIN CategoriaPelicula C ON P.CodigoCategoria = C.CodigoCategoria
+WHERE P.NombrePelicula = @Nombrepelicula
+    ELSE 
+    PRINT'Esa pelicula no existe'
+commit
+end try
+begin catch
+rollback
+print error_message()
+end catch;
+GO
+
+EXEC datosPelicula 'Titanic';
+
+-- e.
+CREATE PROCEDURE sp_Recaudacion
+    @Dinero MONEY
+AS
+	SELECT P.NombrePelicula, COUNT(R.CodigoPelicula)*P.Costo FROM Pelicula P INNER JOIN Renta R ON P.CodigoPelicula = R.CodigoPelicula GROUP BY P.Costo, p.NombrePelicula
+	HAVING @Dinero>=( SELECT COUNT(R.CodigoPelicula)*P.Costo )
+	
+GO
+
+EXEC sp_Recaudacion 20.00;
+
+-- f.
+
+CREATE PROCEDURE sp_datosDUI
+    @DUI VARCHAR(10)
+AS
+BEGIN TRY
+BEGIN TRAN
+IF(SELECT COUNT(*)
+FROM Cliente
+WHERE DUI=@DUI)=1
+    SELECT *
+FROM Cliente
+WHERE DUI = @DUI
+    ELSE 
+    PRINT'Esa DUI no existe'
+commit
+end try
+begin catch
+rollback
+print error_message()
+end catch;
+GO
+
+EXEC sp_datosDUI '12345678-9';
+
+
+--TRIGGER
+CREATE TRIGGER CalculodeMora
+ON Renta 
+AFTER UPDATE
+AS
+IF UPDATE(Fecha_Devolucion)
+BEGIN 
+UPDATE Renta SET Mora=(SELECT DATEDIFF(DAY, Fecha_Renta, Fecha_Devolucion)*1.50)
+WHERE CodigoRenta = (SELECT i.CodigoRenta FROM inserted i);
+PRINT'Se ingreso la mora'
+END
+GO
+
+UPDATE Renta SET Fecha_Devolucion='2019-11-24' WHERE CodigoRenta= 'RE005'
+
+SELECT * FROM Renta;
