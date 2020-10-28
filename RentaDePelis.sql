@@ -173,7 +173,11 @@ SELECT NombreCliente, Fecha_Afiliacion FROM Cliente WHERE Fecha_Afiliacion > '20
 SELECT NombreCliente, R.CodigoCliente FROM Renta R LEFT JOIN Cliente C ON R.CodigoCliente = C.CodigoCliente
 
 -- e.
-SELECT SUM(Disponibilidad) AS [Total en inventario] FROM Pelicula
+SELECT SUM(Disponibilidad) AS [Total de DVD en inventario] 
+FROM Pelicula P
+INNER JOIN TipoPelicula T 
+ON P.CodigoDepeli = T.CodigoDepeli
+WHERE NombreTipo = 'DVD'
 
 
 
@@ -199,3 +203,67 @@ AS
 	LEFT JOIN Pelicula P
 	ON R.CodigoPelicula = P.CodigoPelicula 
 GO
+
+SELECT * FROM primerasRentadas;
+
+-- c.
+CREATE VIEW dbo.categoriasAlquiladas ([Categoria], [Veces vendida])
+AS	
+	SELECT NombreCategoria, COUNT(NombreCategoria)
+	FROM CategoriaPelicula C
+	INNER JOIN Pelicula P
+	ON C.CodigoCategoria = P.CodigoCategoria
+	RIGHT JOIN Renta R
+	ON P.CodigoPelicula = R.CodigoPelicula
+	GROUP BY NombreCategoria
+GO
+
+SELECT [Categoria], [Veces vendida] FROM categoriasAlquiladas WHERE [Veces vendida] IN (SELECT MAX([Veces vendida]) FROM categoriasAlquiladas);
+SELECT [Categoria], [Veces vendida] FROM categoriasAlquiladas WHERE [Veces vendida] IN (SELECT MIN([Veces vendida]) FROM categoriasAlquiladas);
+
+
+-- PROCEDIMIENTOS ALMACENADOS
+-- a.
+CREATE PROCEDURE cantidadPeliculas
+AS
+	SELECT NombrePelicula, Disponibilidad
+	FROM Pelicula
+	ORDER BY Disponibilidad
+GO
+
+EXEC cantidadPeliculas 
+
+
+-- b.
+
+CREATE PROCEDURE calcularTotal @Total money OUTPUT
+AS
+	DECLARE @TotalCosto money
+	DECLARE @TotalMora money
+
+	SET @TotalCosto = (SELECT SUM(Costo) FROM Pelicula);
+	SET @TotalMora = (SELECT SUM(Mora) FROM Renta WHERE Mora IS NOT NULL);
+	SET @Total = @TotalCosto + @TotalMora;
+GO
+
+DECLARE @TotalReturn money;
+EXEC calcularTotal @TotalReturn OUTPUT;
+SELECT [Total recaudado] = @TotalReturn;
+
+
+-- c.
+
+CREATE PROCEDURE peliculasCliente @NombreCliente varchar(20)
+AS
+	SELECT NombrePelicula
+	FROM Renta R
+	LEFT JOIN Cliente C
+	ON R.CodigoCliente = C.CodigoCliente
+	INNER JOIN Pelicula P
+	ON R.CodigoPelicula = P.CodigoPelicula
+	INNER JOIN CategoriaPelicula CG
+	ON P.CodigoCategoria = CG.CodigoCategoria
+	WHERE NombreCliente = 'Darrel'
+GO 
+
+EXEC peliculasCliente 'Darrel'
